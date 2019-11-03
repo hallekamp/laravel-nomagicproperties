@@ -10,6 +10,13 @@ use ReflectionProperty;
  */
 trait NoMagicProperties
 {
+    /**
+     * NoMagicProperties constructor.
+     *
+     * Delete declared properties prior to laravel initializing magic
+     * @param array $attributes
+     * @throws \ReflectionException
+     */
     public function __construct(array $attributes = [])
     {
         $reflect = new ReflectionClass(self::class);
@@ -17,8 +24,12 @@ trait NoMagicProperties
 
         foreach ($props as $prop) {
             $propertyName = $prop->getName();
-            unset($this->$propertyName);
+            // delete only properties that are declared in local model
+            if ($prop->getDeclaringClass()->getName() === self::class){
+                unset($this->$propertyName);
+            }
         }
+
         parent::__construct($attributes);
     }
 }
