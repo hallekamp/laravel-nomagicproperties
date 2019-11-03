@@ -11,9 +11,11 @@ abstract class TestCase extends Orchestra
     /**
      * Setup the test environment.
      */
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
+
+        $this->loadMigrationsFrom(__DIR__ . '/database/migrations');
     }
 
     /**

@@ -15,7 +15,7 @@ composer require hallekamp/laravel-nomagicproperties
 
 Usage
 -----
-Include trait in your models or extend from Hallekamp\NoMagicProperties\Models\NoMagicPropertiesModel;
+Just include the trait in your models.
 ```php
 <?php
 
