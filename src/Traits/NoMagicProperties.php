@@ -30,7 +30,7 @@ trait NoMagicProperties
                     $columns = $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
                     if(in_array($propertyName."_id",$columns)){
                         $propertyName = $propertyName."_id";
-                        if (!in_array($propertyName, $this->fillable)){
+                        if (in_array($propertyName, $this->fillable)){
                             continue;
                         }
                     }
