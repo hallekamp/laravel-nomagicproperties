@@ -27,6 +27,13 @@ trait NoMagicProperties
             // delete only properties that are declared in local model
             if ($prop->getDeclaringClass()->getName() === self::class) {
                 if (!in_array($propertyName, $this->fillable)){
+                    $columns = $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
+                    if(in_array($propertyName."_id",$columns)){
+                        $propertyName = $propertyName."_id";
+                        if (!in_array($propertyName, $this->fillable)){
+                            continue;
+                        }
+                    }
                     $this->fillable[] = $propertyName;
                 }
                 unset($this->$propertyName);
