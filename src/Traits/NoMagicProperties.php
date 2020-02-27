@@ -25,7 +25,10 @@ trait NoMagicProperties
         foreach ($props as $prop) {
             $propertyName = $prop->getName();
             // delete only properties that are declared in local model
-            if ($prop->getDeclaringClass()->getName() === self::class){
+            if ($prop->getDeclaringClass()->getName() === self::class) {
+                if (!in_array($propertyName, $this->fillable)){
+                    $this->fillable[] = $propertyName;
+                }
                 unset($this->$propertyName);
             }
         }
