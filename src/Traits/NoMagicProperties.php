@@ -10,6 +10,7 @@ use ReflectionProperty;
  */
 trait NoMagicProperties
 {
+    private static $modelCache;
     /**
      * NoMagicProperties constructor.
      *
@@ -19,16 +20,23 @@ trait NoMagicProperties
      */
     public function __construct(array $attributes = [])
     {
-        $reflect = new ReflectionClass(self::class);
-        $props = $reflect->getProperties(ReflectionProperty::IS_PUBLIC);
+        if(empty(self::$modelCache)){
+            $reflect = new ReflectionClass(self::class);
+            $props = $reflect->getProperties(ReflectionProperty::IS_PUBLIC);
 
-        foreach ($props as $prop) {
+            $columns = $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
+            self::$modelCache = [
+                'props' => $props,
+                'columns' => $columns
+            ];
+
+        }
+        foreach (self::$modelCache['props'] as $prop) {
             $propertyName = $prop->getName();
             // delete only properties that are declared in local model
             if ($prop->getDeclaringClass()->getName() === self::class) {
                 if (!in_array($propertyName, $this->fillable)){
-                    $columns = $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
-                    if(in_array($propertyName."_id",$columns)){
+                    if(in_array($propertyName."_id",self::$modelCache['columns'])){
                         $propertyName = $propertyName."_id";
                         if (in_array($propertyName, $this->fillable)){
                             continue;
