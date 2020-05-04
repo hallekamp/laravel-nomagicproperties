@@ -21,7 +21,7 @@ trait NoMagicProperties
     public function __construct(array $attributes = [])
     {
         if(empty(ModelCache::$modelCache[static::class])){
-            file_put_contents(storage_path('modelcache.log'),'cache miss for '.static::class."\n");
+//            file_put_contents(storage_path('modelcache.log'),'cache miss for '.static::class."\n");
             $reflect = new ReflectionClass(self::class);
             $props = $reflect->getProperties(ReflectionProperty::IS_PUBLIC);
 
