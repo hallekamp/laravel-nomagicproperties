@@ -2,6 +2,7 @@
 
 namespace Hallekamp\NoMagicProperties\Traits;
 
+use Hallekamp\NoMagicProperties\ModelCache;
 use ReflectionClass;
 use ReflectionProperty;
 
@@ -10,7 +11,6 @@ use ReflectionProperty;
  */
 trait NoMagicProperties
 {
-    private static $modelCache;
     /**
      * NoMagicProperties constructor.
      *
@@ -20,23 +20,24 @@ trait NoMagicProperties
      */
     public function __construct(array $attributes = [])
     {
-        if(empty(self::$modelCache)){
+        if(empty(ModelCache::$modelCache[static::class])){
+            file_put_contents(storage_path('modelcache.log'),'cache miss for '.static::class."\n");
             $reflect = new ReflectionClass(self::class);
             $props = $reflect->getProperties(ReflectionProperty::IS_PUBLIC);
 
             $columns = $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
-            self::$modelCache = [
+            ModelCache::$modelCache[static::class] = [
                 'props' => $props,
                 'columns' => $columns
             ];
 
         }
-        foreach (self::$modelCache['props'] as $prop) {
+        foreach (ModelCache::$modelCache[static::class]['props'] as $prop) {
             $propertyName = $prop->getName();
             // delete only properties that are declared in local model
             if ($prop->getDeclaringClass()->getName() === self::class) {
                 if (!in_array($propertyName, $this->fillable)){
-                    if(in_array($propertyName."_id",self::$modelCache['columns'])){
+                    if(in_array($propertyName."_id",ModelCache::$modelCache[static::class]['columns'])){
                         $propertyName = $propertyName."_id";
                         if (in_array($propertyName, $this->fillable)){
                             continue;
