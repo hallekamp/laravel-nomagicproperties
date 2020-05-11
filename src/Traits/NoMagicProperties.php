@@ -40,6 +40,8 @@ trait NoMagicProperties
                 if (!in_array($propertyName, $this->fillable)) {
 //                    echo "property $propertyName not in fillable\n";
                     if (in_array($propertyName . "_id", ModelCache::$modelCache[static::class]['columns'])) {
+                        // unset relation property
+                        unset($this->$propertyName);
                         $propertyName = $propertyName . "_id";
                         if (in_array($propertyName, $this->fillable)) {
                             continue;
