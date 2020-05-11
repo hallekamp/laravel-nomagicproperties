@@ -20,9 +20,9 @@ trait NoMagicProperties
      */
     public function __construct(array $attributes = [])
     {
-        if(empty(ModelCache::$modelCache[static::class])){
+        if (empty(ModelCache::$modelCache[static::class])) {
 //            file_put_contents(storage_path('modelcache.log'),'cache miss for '.static::class."\n");
-            $reflect = new ReflectionClass(self::class);
+            $reflect = new ReflectionClass(static::class);
             $props = $reflect->getProperties(ReflectionProperty::IS_PUBLIC);
 
             $columns = $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
@@ -35,18 +35,33 @@ trait NoMagicProperties
         foreach (ModelCache::$modelCache[static::class]['props'] as $prop) {
             $propertyName = $prop->getName();
             // delete only properties that are declared in local model
-            if ($prop->getDeclaringClass()->getName() === self::class) {
-                if (!in_array($propertyName, $this->fillable)){
-                    if(in_array($propertyName."_id",ModelCache::$modelCache[static::class]['columns'])){
-                        $propertyName = $propertyName."_id";
-                        if (in_array($propertyName, $this->fillable)){
+//            echo $propertyName . ":\t" . $prop->getDeclaringClass()->getName() . "\t" . static::class . "\n";
+            if ($prop->getDeclaringClass()->getName() === static::class) {
+                if (!in_array($propertyName, $this->fillable)) {
+//                    echo "property $propertyName not in fillable\n";
+                    if (in_array($propertyName . "_id", ModelCache::$modelCache[static::class]['columns'])) {
+                        $propertyName = $propertyName . "_id";
+                        if (in_array($propertyName, $this->fillable)) {
                             continue;
                         }
+                    } elseif (strtolower($propertyName) != $propertyName) {
+                        $propertyName = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $propertyName));
+                        if(!in_array($propertyName, ModelCache::$modelCache[static::class]['columns'])){
+                            continue;
+                        }
+                    } elseif (!in_array($propertyName, ModelCache::$modelCache[static::class]['columns'])) {
+                        continue;
                     }
+//                    echo "add $propertyName to fillable";
                     $this->fillable[] = $propertyName;
                 }
                 unset($this->$propertyName);
             }
+        }
+//        dump($this->fillable);
+//        dump(ModelCache::$modelCache[static::class]);
+        if (empty($this->fillable)) {
+            $this->fillable = ModelCache::$modelCache[static::class]['columns'];
         }
 
         parent::__construct($attributes);
