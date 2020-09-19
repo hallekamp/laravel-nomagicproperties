@@ -5,6 +5,7 @@ namespace Hallekamp\NoMagicProperties\Traits;
 use Hallekamp\NoMagicProperties\ModelCache;
 use ReflectionClass;
 use ReflectionProperty;
+use ReflectionMethod;
 
 /**
  * trait to disable some of the laravel magic to allow for property declaration.
@@ -24,11 +25,14 @@ trait NoMagicProperties
 //            file_put_contents(storage_path('modelcache.log'),'cache miss for '.static::class."\n");
             $reflect = new ReflectionClass(static::class);
             $props = $reflect->getProperties(ReflectionProperty::IS_PUBLIC);
-
+            $methods = $reflect->getMethods(ReflectionMethod::IS_PUBLIC);
             $columns = $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
             ModelCache::$modelCache[static::class] = [
                 'props' => $props,
-                'columns' => $columns
+                'methods' => array_map(function ($method) {
+                    return $method->getName();
+                }, $methods),
+                'columns' => $columns,
             ];
 
         }
@@ -47,11 +51,25 @@ trait NoMagicProperties
                             continue;
                         }
                     } elseif (strtolower($propertyName) != $propertyName) {
-                        $propertyName = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $propertyName));
-                        if(!in_array($propertyName, ModelCache::$modelCache[static::class]['columns'])){
-                            continue;
+                        if (in_array(
+                            "get" . ucfirst($propertyName) . "Attribute",
+                            ModelCache::$modelCache[static::class]['methods'])
+                        ) {
+                            unset($this->$propertyName);
                         }
+                        $propertyName = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $propertyName));
+                        if (in_array($propertyName, ModelCache::$modelCache[static::class]['columns'])) {
+
+                            unset($this->$propertyName);
+                        }
+                        continue;
                     } elseif (!in_array($propertyName, ModelCache::$modelCache[static::class]['columns'])) {
+                        if (in_array(
+                            "get" . ucfirst($propertyName) . "Attribute",
+                            ModelCache::$modelCache[static::class]['methods'])
+                        ) {
+                            unset($this->$propertyName);
+                        }
                         continue;
                     }
 //                    echo "add $propertyName to fillable";
@@ -60,8 +78,6 @@ trait NoMagicProperties
                 unset($this->$propertyName);
             }
         }
-//        dump($this->fillable);
-//        dump(ModelCache::$modelCache[static::class]);
         if (empty($this->fillable)) {
             $this->fillable = ModelCache::$modelCache[static::class]['columns'];
         }
