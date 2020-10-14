@@ -51,6 +51,7 @@ trait NoMagicProperties
                             continue;
                         }
                     } elseif (strtolower($propertyName) != $propertyName) {
+                        // property in camel case
                         if (in_array(
                             "get" . ucfirst($propertyName) . "Attribute",
                             ModelCache::$modelCache[static::class]['methods'])
@@ -68,6 +69,13 @@ trait NoMagicProperties
                             "get" . ucfirst($propertyName) . "Attribute",
                             ModelCache::$modelCache[static::class]['methods'])
                         ) {
+                            // accessors
+                            unset($this->$propertyName);
+                        }elseif (in_array(
+                            lcfirst(ucwords(str_replace('_',' ',$propertyName))),
+                            ModelCache::$modelCache[static::class]['methods'])
+                        ) {
+                            // relations without column in this table, for example hasMany
                             unset($this->$propertyName);
                         }
                         continue;
