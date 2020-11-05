@@ -21,10 +21,17 @@ trait NoMagicProperties
      */
     public function __construct(array $attributes = [])
     {
+        ModelCache::restore();
         if (empty(ModelCache::$modelCache[static::class])) {
 //            file_put_contents(storage_path('modelcache.log'),'cache miss for '.static::class."\n");
             $reflect = new ReflectionClass(static::class);
-            $props = $reflect->getProperties(ReflectionProperty::IS_PUBLIC);
+            $props = [];
+            foreach ($reflect->getProperties(ReflectionProperty::IS_PUBLIC) as $prop) {
+                $props[]=[
+                    'name'=> $prop->getName(),
+                    'class' => $prop->getDeclaringClass()->getName()
+                ];
+            }
             $methods = $reflect->getMethods(ReflectionMethod::IS_PUBLIC);
             $columns = $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
             ModelCache::$modelCache[static::class] = [
@@ -35,12 +42,16 @@ trait NoMagicProperties
                 'columns' => $columns,
             ];
 
+            ModelCache::save();
         }
         foreach (ModelCache::$modelCache[static::class]['props'] as $prop) {
-            $propertyName = $prop->getName();
+//            $propertyName = $prop->getName();
+
             // delete only properties that are declared in local model
 //            echo $propertyName . ":\t" . $prop->getDeclaringClass()->getName() . "\t" . static::class . "\n";
-            if ($prop->getDeclaringClass()->getName() === static::class) {
+            if ($prop['class'] === static::class) {
+                $propertyName = $prop['name'];
+
                 if (!in_array($propertyName, $this->fillable)) {
 //                    echo "property $propertyName not in fillable\n";
                     if (in_array($propertyName . "_id", ModelCache::$modelCache[static::class]['columns'])) {
@@ -51,7 +62,6 @@ trait NoMagicProperties
                             continue;
                         }
                     } elseif (strtolower($propertyName) != $propertyName) {
-                        // property in camel case
                         if (in_array(
                             "get" . ucfirst($propertyName) . "Attribute",
                             ModelCache::$modelCache[static::class]['methods'])
@@ -69,13 +79,6 @@ trait NoMagicProperties
                             "get" . ucfirst($propertyName) . "Attribute",
                             ModelCache::$modelCache[static::class]['methods'])
                         ) {
-                            // accessors
-                            unset($this->$propertyName);
-                        }elseif (in_array(
-                            lcfirst(ucwords(str_replace('_',' ',$propertyName))),
-                            ModelCache::$modelCache[static::class]['methods'])
-                        ) {
-                            // relations without column in this table, for example hasMany
                             unset($this->$propertyName);
                         }
                         continue;
