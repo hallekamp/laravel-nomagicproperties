@@ -3,6 +3,7 @@
 namespace Hallekamp\NoMagicProperties\Traits;
 
 use Hallekamp\NoMagicProperties\ModelCache;
+use Illuminate\Database\Eloquent\Model;
 use ReflectionClass;
 use ReflectionProperty;
 use ReflectionMethod;
@@ -22,28 +23,14 @@ trait NoMagicProperties
     public function __construct(array $attributes = [])
     {
         ModelCache::restore();
-        if (empty(ModelCache::$modelCache[static::class])) {
-//            file_put_contents(storage_path('modelcache.log'),'cache miss for '.static::class."\n");
-            $reflect = new ReflectionClass(static::class);
-            $props = [];
-            foreach ($reflect->getProperties(ReflectionProperty::IS_PUBLIC) as $prop) {
-                $props[]=[
-                    'name'=> $prop->getName(),
-                    'class' => $prop->getDeclaringClass()->getName()
-                ];
-            }
-            $methods = $reflect->getMethods(ReflectionMethod::IS_PUBLIC);
-            $columns = $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
-            ModelCache::$modelCache[static::class] = [
-                'props' => $props,
-                'methods' => array_map(function ($method) {
-                    return $method->getName();
-                }, $methods),
-                'columns' => $columns,
-            ];
 
-            ModelCache::save();
+        if (!isset(ModelCache::$modelCache[Model::class])) {
+            $this->walkModel(Model::class);
         }
+        $this->walkModel(static::class, get_parent_class(static::class));
+
+        ModelCache::save();
+
         foreach (ModelCache::$modelCache[static::class]['props'] as $prop) {
 //            $propertyName = $prop->getName();
 
@@ -52,37 +39,45 @@ trait NoMagicProperties
             if ($prop['class'] === static::class) {
                 $propertyName = $prop['name'];
 
-                if (!in_array($propertyName, $this->fillable)) {
-//                    echo "property $propertyName not in fillable\n";
-                    if (in_array($propertyName . "_id", ModelCache::$modelCache[static::class]['columns'])) {
-                        // unset relation property
-                        unset($this->$propertyName);
-                        $propertyName = $propertyName . "_id";
-                        if (in_array($propertyName, $this->fillable)) {
-                            continue;
-                        }
-                    } elseif (strtolower($propertyName) != $propertyName) {
-                        if (in_array(
-                            "get" . ucfirst($propertyName) . "Attribute",
-                            ModelCache::$modelCache[static::class]['methods'])
-                        ) {
-                            unset($this->$propertyName);
-                        }
-                        $propertyName = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $propertyName));
-                        if (in_array($propertyName, ModelCache::$modelCache[static::class]['columns'])) {
-
-                            unset($this->$propertyName);
-                        }
-                        continue;
-                    } elseif (!in_array($propertyName, ModelCache::$modelCache[static::class]['columns'])) {
-                        if (in_array(
-                            "get" . ucfirst($propertyName) . "Attribute",
-                            ModelCache::$modelCache[static::class]['methods'])
-                        ) {
-                            unset($this->$propertyName);
-                        }
+                if (in_array($propertyName . "_id", ModelCache::$modelCache[static::class]['columns'])) {
+                    // unset relation property
+                    unset($this->$propertyName);
+                    $propertyName = $propertyName . "_id";
+                    if (in_array($propertyName, $this->fillable)) {
                         continue;
                     }
+                } elseif (in_array($propertyName, ModelCache::$modelCache[static::class]['methods'])) {
+                    // many to many relations
+                    unset($this->$propertyName);
+                } elseif (strtolower($propertyName) != $propertyName) {
+                    if (in_array(
+                        "get" . ucfirst($propertyName) . "Attribute",
+                        ModelCache::$modelCache[static::class]['methods'])
+                    ) {
+                        unset($this->$propertyName);
+                    } else {
+                        $propertyName = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $propertyName));
+                        if (in_array($propertyName, ModelCache::$modelCache[static::class]['columns'])) {
+                            unset($this->$propertyName);
+                        }
+                    }
+                    continue;
+                } elseif (!in_array($propertyName, ModelCache::$modelCache[static::class]['columns'])) {
+                    // mutations
+                    if (in_array(
+                        "get" . ucfirst($propertyName) . "Attribute",
+                        ModelCache::$modelCache[static::class]['methods'])
+                    ) {
+                        unset($this->$propertyName);
+                    } elseif (in_array(
+                        "set" . ucfirst($propertyName) . "Attribute",
+                        ModelCache::$modelCache[static::class]['methods'])
+                    ) {
+                        unset($this->$propertyName);
+                    }
+                    continue;
+                }
+                if (!in_array($propertyName, $this->fillable)) {
 //                    echo "add $propertyName to fillable";
                     $this->fillable[] = $propertyName;
                 }
@@ -94,5 +89,43 @@ trait NoMagicProperties
         }
 
         parent::__construct($attributes);
+    }
+
+    private function walkModel($model, $parent = false)
+    {
+        if ($parent !== false) {
+            $this->walkModel($parent);
+        }
+        if (!isset(ModelCache::$modelCache[$model])) {
+            $reflect = new ReflectionClass($model);
+            $props = [];
+            foreach ($reflect->getProperties(ReflectionProperty::IS_PUBLIC) as $prop) {
+                $class = $prop->getDeclaringClass()->getName();
+                if ($class !== $parent && $class !== Model::class) {
+                    $props[] = [
+                        'name' => $prop->getName(),
+                        'class' => $class,
+                    ];
+                }
+            }
+            if ($parent !== false) {
+                $methods = array_filter($reflect->getMethods(ReflectionMethod::IS_PUBLIC), function ($method) use ($parent) {
+                    return (
+                        !in_array($method->getName(), ModelCache::$modelCache[$parent]['methods']) &&
+                        !in_array($method->getName(), ModelCache::$modelCache[Model::class]['methods'])
+                    );
+                });
+            } else {
+                $methods = $reflect->getMethods(ReflectionMethod::IS_PUBLIC);
+            }
+            $columns = $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
+            ModelCache::$modelCache[$model] = [
+                'props' => $props,
+                'methods' => array_map(function ($method) {
+                    return $method->getName();
+                }, $methods),
+                'columns' => $columns,
+            ];
+        }
     }
 }
