@@ -29,8 +29,6 @@ trait NoMagicProperties
         }
         $this->walkModel(static::class, get_parent_class(static::class));
 
-        ModelCache::save();
-
         foreach (ModelCache::$modelCache[static::class]['props'] as $prop) {
 //            $propertyName = $prop->getName();
 
@@ -126,6 +124,8 @@ trait NoMagicProperties
                 }, $methods),
                 'columns' => $columns,
             ];
+
+            ModelCache::save();
         }
     }
 }
