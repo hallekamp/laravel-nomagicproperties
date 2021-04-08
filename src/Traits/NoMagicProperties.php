@@ -47,6 +47,7 @@ trait NoMagicProperties
                 } elseif (in_array($propertyName, ModelCache::$modelCache[static::class]['methods'])) {
                     // many to many relations
                     unset($this->$propertyName);
+                    continue;
                 } elseif (strtolower($propertyName) != $propertyName) {
                     if (in_array(
                         "get" . ucfirst($propertyName) . "Attribute",
