@@ -23,11 +23,13 @@ trait NoMagicProperties
     public function __construct(array $attributes = [])
     {
         ModelCache::restore();
-
-        if (!isset(ModelCache::$modelCache[Model::class])) {
-            $this->walkModel(Model::class);
+        if (!isset(ModelCache::$modelCache[static::class])) {
+            $this->walkModel(static::class);
+            $parent = get_parent_class(static::class);
+            if (!isset(ModelCache::$modelCache[$parent])) {
+                $this->walkModel(static::class, $parent);
+            }
         }
-        $this->walkModel(static::class, get_parent_class(static::class));
 
         foreach (ModelCache::$modelCache[static::class]['props'] as $prop) {
 //            $propertyName = $prop->getName();

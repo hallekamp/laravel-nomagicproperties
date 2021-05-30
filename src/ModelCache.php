@@ -11,6 +11,7 @@ class ModelCache
      * @var array
      */
     public static $modelCache = [];
+    public static $modelCacheInit = false;
 
     /**
      * cache time to live.
@@ -20,22 +21,28 @@ class ModelCache
      */
     public static $ttl = 604800;
 
-    public static function restore(){
-        if(in_array(config('cache.default'), [
-            'redis',
-            'predis',
-            'phpredis',
-        ])){
-            static::$modelCache = Cache::get('lnmp_mc');
+    public static function restore()
+    {
+        if(static::$modelCacheInit === false){
+            if (in_array(config('cache.default'), [
+                'redis',
+                'predis',
+                'phpredis',
+            ])) {
+                static::$modelCache = Cache::get('lnmp_mc');
+                static::$modelCacheInit = true;
+            }
         }
     }
-    public static function save(){
-        if(in_array(config('cache.default'), [
+
+    public static function save()
+    {
+        if (in_array(config('cache.default'), [
             'redis',
             'predis',
             'phpredis',
-        ])){
-            Cache::put('lnmp_mc',static::$modelCache, static::$ttl);
+        ])) {
+            Cache::put('lnmp_mc', static::$modelCache, static::$ttl);
         }
     }
 
@@ -45,12 +52,13 @@ class ModelCache
             static::$modelCache[$channel] = [];
         } else {
             static::$modelCache = [];
+            static::$modelCacheInit = false;
         }
-        if(in_array(config('cache.default'), [
+        if (in_array(config('cache.default'), [
             'redis',
             'predis',
             'phpredis',
-        ])){
+        ])) {
             Cache::forget('lnmp_mc');
         }
     }
